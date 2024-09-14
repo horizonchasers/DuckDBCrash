@@ -81,6 +81,8 @@ public class SimplifiedFileAnalyzer
     public void InitializeDuckDB()
     {
         Console.WriteLine("Initializing DuckDB...");
+        Console.WriteLine($"Connection string: {_connectionString}");
+
         using var connection = new DuckDBConnection(_connectionString);
         connection.Open();
         using var command = connection.CreateCommand();
