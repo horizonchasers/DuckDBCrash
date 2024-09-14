@@ -34,7 +34,7 @@ public class Program
 public class SimplifiedFileAnalyzer
 {
     private readonly string _connectionString;
-    private const int BatchSize = 1500;
+    private const int BatchSize = 1000;
 
     public SimplifiedFileAnalyzer(string dbPath)
     {
