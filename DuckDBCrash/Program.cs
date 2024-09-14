@@ -1,17 +1,53 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
 using DuckDB.NET.Data;
+using System.CommandLine;
+using System.CommandLine.Invocation;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
-        string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-        string dbPath = $@"F:\src\DuckDBCrash\DuckDBCrash\database_{timestamp}.db";
-        string jsonFilePath = @"F:\src\DuckDBCrash\DuckDBCrash\scanned_files_dump.json";
+        var rootCommand = new RootCommand
+        {
+            new Option<string>(
+                "--input",
+                description: "Path to the input JSON file.",
+                getDefaultValue: () => "scanned_files_dump.json"),
+            new Option<int>(
+                "--batch-size",
+                description: "Number of items to process in each batch.",
+                getDefaultValue: () => 1000),
+            new Option<string>(
+                "--db-path",
+                description: "Path to the DuckDB database file.",
+                getDefaultValue: () => $"database_{DateTime.Now:yyyyMMddHHmmss}.db")
+        };
 
+        rootCommand.Description = "File Analyzer using DuckDB";
+
+        rootCommand.SetHandler(async (string input, int batchSize, string dbPath) =>
+        {
+            await RunAnalyzer(input, batchSize, dbPath);
+        },
+        rootCommand.Options.First(o => o.Name == "input") as Option<string>,
+        rootCommand.Options.First(o => o.Name == "batch-size") as Option<int>,
+        rootCommand.Options.First(o => o.Name == "db-path") as Option<string>);
+
+        return await rootCommand.InvokeAsync(args);
+    }
+
+    private static async Task RunAnalyzer(string jsonFilePath, int batchSize, string dbPath)
+    {
         Console.WriteLine($"Using database: {dbPath}");
+        Console.WriteLine($"Input file: {jsonFilePath}");
+        Console.WriteLine($"Batch size: {batchSize}");
 
-        var analyzer = new SimplifiedFileAnalyzer(dbPath);
+        var analyzer = new SimplifiedFileAnalyzer(dbPath, batchSize);
 
         try
         {
@@ -34,11 +70,12 @@ public class Program
 public class SimplifiedFileAnalyzer
 {
     private readonly string _connectionString;
-    private const int BatchSize = 1000;
+    private readonly int _batchSize;
 
-    public SimplifiedFileAnalyzer(string dbPath)
+    public SimplifiedFileAnalyzer(string dbPath, int batchSize)
     {
         _connectionString = $"Data Source={dbPath}";
+        _batchSize = batchSize;
     }
 
     public void InitializeDuckDB()
@@ -128,8 +165,8 @@ public class SimplifiedFileAnalyzer
                 Console.WriteLine("File extensions inserted successfully.");
 
                 // Insert file info
-                var batches = Enumerable.Range(0, (scannedFiles.Count + BatchSize - 1) / BatchSize)
-                    .Select(i => scannedFiles.Skip(i * BatchSize).Take(BatchSize).ToList())
+                var batches = Enumerable.Range(0, (scannedFiles.Count + _batchSize - 1) / _batchSize)
+                    .Select(i => scannedFiles.Skip(i * _batchSize).Take(_batchSize).ToList())
                     .ToList();
 
                 Console.WriteLine($"Inserting file info in {batches.Count} batches...");
