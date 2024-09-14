@@ -4,13 +4,13 @@ This repository contains a minimal example to reproduce a crash in DuckDB.NET wh
 
 ## Issue Description
 
-When attempting to insert a large number of records into a DuckDB database using DuckDB.NET, the application crashes with a heap corruption error (exit code 0xc0000374) if the batch size is too large. The crash occurs during the `appender.Close()` operation.
+When attempting to insert a large number of records into a DuckDB database using DuckDB.NET, the application crashes if the batch size is too large. The crash occurs during the processing of the first batch.
 
 ## Environment
 
 - .NET 8.0
-- DuckDB.NET.Data 1.1.0.1 and 1.0.2
-- Windows 11 Pro x64
+- DuckDB.NET.Data (latest version as of September 2024)
+- Windows 10 (or your specific OS version)
 
 ## Steps to Reproduce
 
@@ -24,14 +24,22 @@ When attempting to insert a large number of records into a DuckDB database using
 
 3. Build the project:
    ```
-   dotnet build
+   dotnet build -c Release
    ```
 
 4. Run the application with different batch sizes:
    ```
-   dotnet run -- 1000  # Works fine
-   dotnet run -- 1500  # Crashes
+   .\DuckDBCrash.exe --batch-size 1000 --input path\to\scanned_files_dump.json
+   .\DuckDBCrash.exe --batch-size 1500 --input path\to\scanned_files_dump.json
    ```
+
+## Command-Line Interface
+
+The application accepts the following command-line arguments:
+
+- `--input`: Path to the input JSON file (default: "scanned_files_dump.json")
+- `--batch-size`: Number of items to process in each batch (default: 1000)
+- `--db-path`: Path to the DuckDB database file (default: "database_[timestamp].db")
 
 ## Code Overview
 
@@ -45,15 +53,19 @@ The crash occurs during the data insertion phase when the batch size is too larg
 
 ## Observed Behavior
 
-- With a batch size of 1000 or less, the insertion completes successfully.
-- With a batch size of 1500 or more, the application crashes with a heap corruption error.
+- With a batch size of 1000:
+  - The insertion completes successfully.
+  - 9 batches are processed for 8841 files.
+
+- With a batch size of 1500:
+  - The application crashes during the processing of the first batch.
 
 ## Error Message
 
-When the crash occurs, you may see an error message similar to this:
+When the crash occurs with a batch size of 1500, the application exits abruptly without a specific error message. The last output is:
 
 ```
-F:\src\DuckDBCrash\DuckDBCrash\bin\Debug\net8.0\DuckDBCrash.exe (process 28128) exited with code -1073740940 (0xc0000374).
+Processing batch 1/6...
 ```
 
 ## Possible Cause
@@ -66,14 +78,14 @@ For now, limiting the batch size to 1000 or less allows the application to run w
 
 ## Additional Notes
 
-- We've also observed a `DivideByZeroException` occurring in the `appender.Close()` method in some cases.
-- The issue is reproducible and occurs consistently with larger batch sizes.
+- The issue is reproducible and occurs consistently with batch sizes of 1500 or more.
+- The application uses a command-line interface for easy testing with different parameters.
 
 ## Next Steps
 
 If you're experiencing this issue:
 
-1. Try reducing your batch size as a temporary workaround.
+1. Try reducing your batch size to 1000 or less as a temporary workaround.
 2. Check the [DuckDB.NET issues page](https://github.com/Giorgi/DuckDB.NET/issues) to see if this has been reported or if there are any updates.
 3. If the issue hasn't been reported, please create a new issue with the details of your reproduction case.
 
